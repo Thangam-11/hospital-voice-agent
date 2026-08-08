@@ -1,0 +1,49 @@
+Metadata-Version: 2.4
+Name: hospital-ai-voice-agent
+Version: 1.0.0
+Summary: Enterprise AI Voice Agent for Hospital Appointment Booking using LangGraph, FastAPI, Twilio, Deepgram, ElevenLabs, PostgreSQL, and Qdrant.
+Author: Your Name
+Requires-Python: <3.13,>=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.116.0
+Requires-Dist: uvicorn[standard]>=0.35.0
+Requires-Dist: langchain>=0.3.27
+Requires-Dist: langchain-community>=0.3.27
+Requires-Dist: langchain-core>=0.3.74
+Requires-Dist: langgraph>=0.6.6
+Requires-Dist: langsmith>=0.4.18
+Requires-Dist: langchain-groq>=0.3.7
+Requires-Dist: sentence-transformers>=5.1.0
+Requires-Dist: qdrant-client>=1.15.1
+Requires-Dist: sqlalchemy>=2.0.43
+Requires-Dist: psycopg[binary]>=3.2.9
+Requires-Dist: alembic>=1.16.4
+Requires-Dist: pydantic>=2.11.7
+Requires-Dist: pydantic-settings>=2.10.1
+Requires-Dist: python-dotenv>=1.1.1
+Requires-Dist: python-jose[cryptography]>=3.5.0
+Requires-Dist: passlib[bcrypt]>=1.7.4
+Requires-Dist: twilio>=9.8.0
+Requires-Dist: deepgram-sdk>=4.8.1
+Requires-Dist: elevenlabs>=2.11.0
+Requires-Dist: httpx>=0.28.1
+Requires-Dist: aiofiles>=24.1.0
+Requires-Dist: prometheus-client>=0.22.1
+Requires-Dist: pandas>=2.3.2
+Requires-Dist: numpy>=2.3.2
+Requires-Dist: orjson>=3.11.2
+Requires-Dist: tenacity>=9.1.2
+Requires-Dist: python-multipart>=0.0.20
+Requires-Dist: loguru>=0.7.3
+Provides-Extra: dev
+Requires-Dist: pytest>=8.4.1; extra == "dev"
+Requires-Dist: pytest-asyncio>=1.1.0; extra == "dev"
+Requires-Dist: pytest-cov>=6.2.1; extra == "dev"
+Requires-Dist: ruff>=0.12.9; extra == "dev"
+Requires-Dist: mypy>=1.17.1; extra == "dev"
+Requires-Dist: pre-commit>=4.3.0; extra == "dev"
+Provides-Extra: dashboard
+Requires-Dist: streamlit>=1.48.1; extra == "dashboard"
+Provides-Extra: rag
+Requires-Dist: docling>=2.48.0; extra == "rag"
+Requires-Dist: pymupdf>=1.26.4; extra == "rag"
