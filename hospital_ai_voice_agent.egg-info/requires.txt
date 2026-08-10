@@ -28,6 +28,7 @@ orjson>=3.11.2
 tenacity>=9.1.2
 python-multipart>=0.0.20
 loguru>=0.7.3
+ipykernel>=7.3.0
 
 [dashboard]
 streamlit>=1.48.1

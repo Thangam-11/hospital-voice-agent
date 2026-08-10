@@ -2,3 +2,8 @@
 .env.example
 .env
 .envrc
+venv
+.venv/
+pycache/
+egg-info/
+*.pyc
