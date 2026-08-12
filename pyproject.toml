@@ -81,6 +81,7 @@ dependencies = [
     # ==========================
     "loguru>=0.7.3",
     "ipykernel>=7.3.0",
+    "livekit-plugins-openai>=1.6.9",
 ]
 
 [project.optional-dependencies]

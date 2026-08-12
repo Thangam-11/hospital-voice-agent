@@ -3,24 +3,38 @@ FastAPI entrypoint. Run with:
     uvicorn src.main:app --reload
 """
 
+from typing import Optional
+
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from langchain_core.messages import HumanMessage
 
 from src.database.base_engine import get_db
-from src.agent.orchestrator import AgentOrchestrator
+from src.agent.agent_core import build_agent
 from src.configure.settings import get_settings
 from src.api_service.routers.appointment import router as appointment_router
+from src.service.appointment_service import AppointmentService
+from src.service.patient_service import PatientService
+
+from src.api_service.routers.patient import router as patient_router
+from langgraph.errors import GraphRecursionError
+from langgraph.checkpoint.memory import MemorySaver
+# Swap for a persistent checkpointer in production, e.g.:
+# from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+# ... existing imports ...
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
 app.include_router(appointment_router)
+app.include_router(patient_router)
 
-# One orchestrator per call in a real deployment (keyed by call_sid, with
-# conversation history persisted/restored per call). For local text-testing
-# via /chat, a single in-memory instance is enough to iterate on the agent
-# before wiring up Twilio.
-_dev_orchestrator: AgentOrchestrator | None = None
+# One checkpointer for the app's lifetime. Conversation memory across
+# turns of the same conversation_id depends on THIS instance being
+# reused — a fresh MemorySaver per request would silently make every
+# turn forget everything before it, even with a matching thread_id.
+_checkpointer = MemorySaver()
 
 
 @app.get("/health")
@@ -30,6 +44,7 @@ async def health():
 
 class ChatRequest(BaseModel):
     message: str
+    conversation_id: Optional[str] = "dev-session"
 
 
 class ChatResponse(BaseModel):
@@ -38,21 +53,29 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest, session: AsyncSession = Depends(get_db)):
-    """
-    Text-based endpoint for testing the agent's tool-calling behavior
-    without voice in the loop yet. Same orchestrator that will eventually
-    sit behind the Twilio webhook.
-    """
-    global _dev_orchestrator
-    if _dev_orchestrator is None:
-        _dev_orchestrator = AgentOrchestrator(session)
+    appointment_service = AppointmentService(session)
+    patient_service = PatientService(session)
+    agent = build_agent(appointment_service, patient_service, _checkpointer)
 
-    reply = await _dev_orchestrator.handle_turn(payload.message)
-    return ChatResponse(reply=reply)
+    config = {
+        "configurable": {"thread_id": payload.conversation_id},
+        "recursion_limit": 15,
+    }
+
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=payload.message)]},
+            config=config,
+        )
+    except GraphRecursionError:
+        return ChatResponse(
+            reply="Something went wrong on my end — let me connect you with a staff member."
+        )
+
+    last_message = result["messages"][-1]
+    return ChatResponse(reply=last_message.content)
 
 
-# Twilio voice webhook — stub for now, filled in once the text-based agent
-# (via /chat above) is behaving correctly. See roadmap step 5.
 @app.post("/voice/webhook")
 async def voice_webhook():
     return {"status": "not_implemented"}

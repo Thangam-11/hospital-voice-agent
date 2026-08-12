@@ -22,7 +22,7 @@ from src.utils.exceptions import (
     SlotNotFoundError,
     SlotUnavailableError,
 )
-from src.api_service.schemas.appointment_schema  import (
+from src.api_service.schemas.appointment_schema import (
     AppointmentBookRequest,
     AppointmentListResponse,
     AppointmentResponse,
@@ -62,7 +62,6 @@ async def book_appointment(
             slot_id=payload.slot_id,
             reason=payload.reason,
         )
-        return appointment
     except SlotNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except SlotUnavailableError as e:
@@ -70,15 +69,18 @@ async def book_appointment(
         # (slot already taken) prevents fulfilling it right now.
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
+    return appointment
+
 
 @router.post("/{appointment_id}/cancel", response_model=AppointmentResponse)
 async def cancel_appointment(
     appointment_id: UUID,
+    patient_id: UUID = Query(..., description="Patient requesting the cancellation"),
     session: AsyncSession = Depends(get_db),
 ):
     service = AppointmentService(session)
     try:
-        return await service.cancel_appointment(appointment_id)
+        return await service.cancel_appointment(appointment_id, patient_id)
     except AppointmentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except InvalidAppointmentStateError as e:

@@ -15,12 +15,19 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "INFO"
 
+   # twilio
+    twilio_account_sid: str
+    twilio_auth_token: str
+    twilio_phone_number: int
+
     # ==========================
     # LLM
     # ==========================
+
     openrouter_api_key: str
+    llm_model: str = "qwen/qwen3-30b-a3b-instruct-2507"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    llm_model: str = "meta-llama/llama-3.3-70b-instruct"
+    
 
     # ==========================
     # Embeddings
