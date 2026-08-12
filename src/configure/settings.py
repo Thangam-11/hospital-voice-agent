@@ -15,11 +15,10 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "INFO"
 
-   # twilio
-    twilio_account_sid: str
-    twilio_auth_token: str
-    twilio_phone_number: int
-
+   # livekit configuration
+    livekit_url: str
+    livekit_api_key: str
+    livekit_api_secret: str
     # ==========================
     # LLM
     # ==========================
