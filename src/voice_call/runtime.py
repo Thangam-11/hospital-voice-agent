@@ -1,26 +1,15 @@
 """
 Per-process runtime resources for the LiveKit worker.
 
-Resources created here:
+Resources:
 
 1. SQLAlchemy async session factory
    - Used by PatientService / AppointmentService.
 
-2. LangGraph PostgresSaver (sync, wrapped for async use)
+2. LangGraph AsyncPostgresSaver
    - Used to persist AgentState by thread_id.
-   - Deliberately SYNC, not AsyncPostgresSaver: async psycopg
-     requires SelectorEventLoop, but LiveKit uses ProactorEventLoop
-     on Windows for subprocess support, which causes
-     `psycopg.InterfaceError: Psycopg cannot use the
-     'ProactorEventLoop' to run in async mode`. Sync psycopg has no
-     event-loop restriction, and LangGraph's base checkpointer class
-     already runs sync checkpointers in a thread executor when
-     called from async graph code (graph.ainvoke()), so this is
-     safe to use as-is.
-
-Both resources are created lazily inside the LiveKit job's
-running event loop and reused by jobs handled by the same
-worker process.
+   - Required because the LangGraph graph uses async execution
+     via graph.ainvoke() and async nodes.
 """
 
 from __future__ import annotations
@@ -30,7 +19,9 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from langgraph.checkpoint.postgres import PostgresSaver
+
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -41,7 +32,9 @@ from sqlalchemy.ext.asyncio import (
 from src.configure.settings import get_settings
 from src.utils.logger_exceptions import get_logger
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 load_dotenv(PROJECT_ROOT / ".env")
 
 logger = get_logger(__name__)
@@ -52,28 +45,23 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 _engine: Optional[AsyncEngine] = None
-_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
-_checkpointer: Optional[PostgresSaver] = None
+_session_factory: Optional[
+    async_sessionmaker[AsyncSession]
+] = None
+
+_checkpointer: Optional[AsyncPostgresSaver] = None
+
 _checkpointer_cm = None
 
 _init_lock = asyncio.Lock()
 
 
 # ---------------------------------------------------------------------------
-# SQLAlchemy session factory getter
+# SQLAlchemy session factory
 # ---------------------------------------------------------------------------
 
 async def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    """
-    Return the shared SQLAlchemy session factory for this worker process.
-
-    The factory itself is shared. Each call/turn creates its own
-    AsyncSession through:
-
-        async with session_factory() as session:
-            ...
-    """
 
     global _engine
     global _session_factory
@@ -87,11 +75,16 @@ async def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
             settings = get_settings()
 
-            logger.info("runtime: creating SQLAlchemy async engine")
+            logger.info(
+                "runtime: creating SQLAlchemy async engine"
+            )
 
             _engine = create_async_engine(
                 settings.database_url,
-                echo=(settings.environment.lower() == "development"),
+                echo=(
+                    settings.environment.lower()
+                    == "development"
+                ),
                 pool_pre_ping=True,
                 pool_size=10,
                 max_overflow=20,
@@ -103,23 +96,18 @@ async def get_session_factory() -> async_sessionmaker[AsyncSession]:
                 expire_on_commit=False,
             )
 
-            logger.info("runtime: SQLAlchemy session factory created")
+            logger.info(
+                "runtime: SQLAlchemy async session factory ready"
+            )
 
     return _session_factory
 
 
 # ---------------------------------------------------------------------------
-# LangGraph checkpointer getter
+# LangGraph Async PostgreSQL checkpointer
 # ---------------------------------------------------------------------------
 
-async def get_checkpointer() -> PostgresSaver:
-    """
-    Return the shared LangGraph PostgreSQL checkpointer for this
-    worker process, creating it on first call.
-
-    Stores LangGraph state keyed by the thread_id supplied by
-    runner.handle_turn().
-    """
+async def get_checkpointer() -> AsyncPostgresSaver:
 
     global _checkpointer
     global _checkpointer_cm
@@ -133,30 +121,44 @@ async def get_checkpointer() -> PostgresSaver:
 
             settings = get_settings()
 
-            logger.info("runtime: creating LangGraph PostgreSQL checkpointer (sync)")
-
-            # IMPORTANT: this URL must be compatible with psycopg 3, e.g.
-            #   postgresql://user:password@localhost:5432/hospital
-            #
-            # settings.database_url is SQLAlchemy-style
-            # (postgresql+asyncpg://...) for the async engine above.
-            # psycopg (used by PostgresSaver) doesn't understand the
-            # "+asyncpg" driver suffix, so it's stripped here.
-            checkpointer_url = settings.database_url.replace(
-                "postgresql+asyncpg://", "postgresql://", 1
+            logger.info(
+                "runtime: creating LangGraph "
+                "PostgreSQL ASYNC checkpointer"
             )
 
-            def _create():
-                cm = PostgresSaver.from_conn_string(checkpointer_url)
-                saver = cm.__enter__()
-                saver.setup()
-                return cm, saver
+            # Your SQLAlchemy URL is:
+            #
+            # postgresql+asyncpg://...
+            #
+            # Psycopg expects:
+            #
+            # postgresql://...
+            #
+            checkpointer_url = settings.database_url.replace(
+                "postgresql+asyncpg://",
+                "postgresql://",
+                1,
+            )
 
-            # Runs psycopg's sync connect() in a worker thread so it
-            # never touches the ProactorEventLoop directly.
-            _checkpointer_cm, _checkpointer = await asyncio.to_thread(_create)
+            logger.info(
+                "runtime: initializing AsyncPostgresSaver"
+            )
 
-            logger.info("runtime: LangGraph checkpointer ready")
+            _checkpointer_cm = (
+                AsyncPostgresSaver.from_conn_string(
+                    checkpointer_url
+                )
+            )
+
+            _checkpointer = (
+                await _checkpointer_cm.__aenter__()
+            )
+
+            await _checkpointer.setup()
+
+            logger.info(
+                "runtime: LangGraph AsyncPostgresSaver ready"
+            )
 
     return _checkpointer
 
@@ -166,43 +168,64 @@ async def get_checkpointer() -> PostgresSaver:
 # ---------------------------------------------------------------------------
 
 async def shutdown_runtime() -> None:
-    """
-    Close worker-level resources during shutdown.
-    """
 
     global _engine
     global _session_factory
     global _checkpointer
     global _checkpointer_cm
 
-    logger.info("runtime: shutting down resources")
+    logger.info(
+        "runtime: shutting down resources"
+    )
 
-    # Close LangGraph checkpointer context.
-    # NOTE: PostgresSaver's context manager is sync (__exit__, not
-    # __aexit__) — run it in a thread to match how it was opened.
+    # ---------------------------------------------------------
+    # Close LangGraph async checkpointer
+    # ---------------------------------------------------------
+
     if _checkpointer_cm is not None:
 
         try:
-            await asyncio.to_thread(_checkpointer_cm.__exit__, None, None, None)
+
+            await _checkpointer_cm.__aexit__(
+                None,
+                None,
+                None,
+            )
 
         except Exception:
-            logger.exception("runtime: failed to close LangGraph checkpointer")
+
+            logger.exception(
+                "runtime: failed to close "
+                "LangGraph async checkpointer"
+            )
 
         finally:
+
             _checkpointer = None
             _checkpointer_cm = None
 
+    # ---------------------------------------------------------
     # Dispose SQLAlchemy engine
+    # ---------------------------------------------------------
+
     if _engine is not None:
 
         try:
+
             await _engine.dispose()
 
         except Exception:
-            logger.exception("runtime: failed to dispose SQLAlchemy engine")
+
+            logger.exception(
+                "runtime: failed to dispose "
+                "SQLAlchemy async engine"
+            )
 
         finally:
+
             _engine = None
             _session_factory = None
 
-    logger.info("runtime: shutdown complete")
+    logger.info(
+        "runtime: shutdown complete"
+    )

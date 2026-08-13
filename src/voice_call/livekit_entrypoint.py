@@ -65,6 +65,13 @@ from dotenv import load_dotenv
 # Load .env BEFORE LiveKit worker starts
 load_dotenv()
 
+import asyncio
+import sys
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(
+        asyncio.WindowsSelectorEventLoopPolicy()
+    )
 logger = get_logger(__name__)
 
 

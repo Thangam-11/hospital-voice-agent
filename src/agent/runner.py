@@ -44,7 +44,9 @@ async def handle_turn(
                         HumanMessage(
                             content=patient_utterance
                         )
-                    ]
+                    ],
+                    "call_sid": call_sid,
+                    "caller_phone_number": caller_phone_number,
                 },
                 config=config,
             )
