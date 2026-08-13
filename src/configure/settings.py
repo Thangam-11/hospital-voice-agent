@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     livekit_url: str
     livekit_api_key: str
     livekit_api_secret: str
+
+    # voice
+   
+    deepgram_api_key: str
+    elevenlabs_api_key: str
+    elevenlabs_voice_id : str
+   
     # ==========================
     # LLM
     # ==========================
@@ -55,13 +62,7 @@ class Settings(BaseSettings):
     redis_cache_enabled: bool = True
     redis_cache_ttl_seconds: int = 3600
 
-    # ==========================
-    # Voice
-    # ==========================
-
-    deepgram_api_key: str
-    elevenlabs_api_key: str
-
+   
     # ==========================
     # Monitoring
     # ==========================
