@@ -4,61 +4,44 @@ import {
   CalendarDays,
   ChevronDown,
   Clock3,
+  Mic,
   Plus,
   Search,
 } from "lucide-react";
+
 import { useState } from "react";
 
-const appointments = [
+import VoiceAssistant from "@/components/voice/VoiceAssistant";
+import { createVoiceToken } from "@/lib/api/livekit";
+
+type Appointment = {
+  id: string;
+  patient: string;
+  doctor: string;
+  department: string;
+  date: string;
+  time: string;
+  status: "Completed" | "Confirmed" | "Upcoming" | "Cancelled";
+};
+
+const appointments: Appointment[] = [
   {
-    id: "APT-1001",
-    patient: "Ravi Kumar",
-    doctor: "Dr. Arjun Patel",
+    id: "1",
+    patient: "John Doe",
+    doctor: "Dr. Sarah Lee",
     department: "Cardiology",
-    date: "Aug 14, 2026",
+    date: "2026-08-14",
     time: "10:00 AM",
-    status: "Completed",
-    type: "In-person",
-  },
-  {
-    id: "APT-1002",
-    patient: "Priya Sharma",
-    doctor: "Dr. Neha Gupta",
-    department: "General Medicine",
-    date: "Aug 14, 2026",
-    time: "10:30 AM",
     status: "Confirmed",
-    type: "In-person",
   },
   {
-    id: "APT-1003",
-    patient: "Arun Singh",
-    doctor: "Dr. Mohan Reddy",
-    department: "Neurology",
-    date: "Aug 14, 2026",
-    time: "11:00 AM",
+    id: "2",
+    patient: "Jane Smith",
+    doctor: "Dr. Alan Grant",
+    department: "Orthopedics",
+    date: "2026-08-15",
+    time: "2:30 PM",
     status: "Upcoming",
-    type: "In-person",
-  },
-  {
-    id: "APT-1004",
-    patient: "Meena Devi",
-    doctor: "Dr. Kavita Joshi",
-    department: "Pediatrics",
-    date: "Aug 14, 2026",
-    time: "11:30 AM",
-    status: "Upcoming",
-    type: "Voice Booking",
-  },
-  {
-    id: "APT-1005",
-    patient: "Suresh Kumar",
-    doctor: "Dr. Arjun Patel",
-    department: "Cardiology",
-    date: "Aug 14, 2026",
-    time: "12:00 PM",
-    status: "Confirmed",
-    type: "Web Booking",
   },
 ];
 
@@ -83,324 +66,186 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AppointmentsPage() {
+  // ============================================================
+  // EXISTING PAGE STATE
+  // ============================================================
+
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
 
+  // ============================================================
+  // LIVEKIT STATE
+  // ============================================================
+
+  const [showVoiceAssistant, setShowVoiceAssistant] = useState(false);
+  const [voiceToken, setVoiceToken] = useState<string | null>(null);
+  const [voiceServerUrl, setVoiceServerUrl] = useState<string | null>(null);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+
+  // ============================================================
+  // START VOICE ASSISTANT
+  // ============================================================
+
+  const startVoiceAssistant = async () => {
+    try {
+      setVoiceLoading(true);
+      setVoiceError("");
+
+      const data = await createVoiceToken("Hospital Patient");
+
+      setVoiceToken(data.participant_token);
+      setVoiceServerUrl(data.server_url);
+      setShowVoiceAssistant(true);
+    } catch (error) {
+      console.error("Failed to start voice assistant:", error);
+
+      setVoiceError(
+        error instanceof Error
+          ? error.message
+          : "Unable to start voice assistant.",
+      );
+    } finally {
+      setVoiceLoading(false);
+    }
+  };
+
+  // ============================================================
+  // CLOSE VOICE ASSISTANT
+  // ============================================================
+
+  const closeVoiceAssistant = () => {
+    setShowVoiceAssistant(false);
+    setVoiceToken(null);
+    setVoiceServerUrl(null);
+    setVoiceError("");
+  };
+
+  // ============================================================
+  // EXISTING APPOINTMENT FILTER
+  // ============================================================
+
   const filteredAppointments = appointments.filter(
     (appointment) =>
-      appointment.patient
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      appointment.doctor
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      appointment.department
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+      appointment.patient.toLowerCase().includes(search.toLowerCase()) ||
+      appointment.doctor.toLowerCase().includes(search.toLowerCase()) ||
+      appointment.department.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
-    <div className="mx-auto max-w-[1600px] px-6 py-8">
-      {/* Page heading */}
-      <div className="mb-8 flex items-start justify-between">
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Appointments
-          </h1>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage patient appointments across all booking channels.
+          <h1 className="text-2xl font-semibold">Appointments</h1>
+          <p className="text-sm text-muted-foreground">
+            View and manage patient appointments.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          New Appointment
+        <div className="flex items-center gap-2">
+          <button
+            onClick={startVoiceAssistant}
+            disabled={voiceLoading}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            <Mic className="h-4 w-4" />
+            {voiceLoading ? "Starting…" : "Voice Assistant"}
+          </button>
+
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            New Appointment
+          </button>
+        </div>
+      </div>
+
+      {voiceError && (
+        <div className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">
+          {voiceError}
+        </div>
+      )}
+
+      {/* Search + Filters */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by patient, doctor, or department"
+            className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+
+        <button className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted">
+          <CalendarDays className="h-4 w-4" />
+          Date
+          <ChevronDown className="h-4 w-4" />
+        </button>
+
+        <button className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted">
+          Status
+          <ChevronDown className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Summary */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-sm text-muted-foreground">
-            Total Today
-          </p>
-          <p className="mt-2 text-2xl font-semibold">45</p>
-        </div>
-
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-sm text-muted-foreground">
-            Confirmed
-          </p>
-          <p className="mt-2 text-2xl font-semibold">24</p>
-        </div>
-
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-sm text-muted-foreground">
-            Upcoming
-          </p>
-          <p className="mt-2 text-2xl font-semibold">18</p>
-        </div>
-
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-sm text-muted-foreground">
-            Completed
-          </p>
-          <p className="mt-2 text-2xl font-semibold">21</p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="mb-4 rounded-xl border bg-white p-4">
-        <div className="flex flex-col gap-3 lg:flex-row">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search patient, doctor, or department..."
-              className="h-10 w-full rounded-lg border bg-white pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
-            />
-          </div>
-
-          {/* Date */}
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-between gap-3 rounded-lg border px-3 text-sm text-muted-foreground hover:bg-muted"
-          >
-            <span className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Today
-            </span>
-
-            <ChevronDown className="h-4 w-4" />
-          </button>
-
-          {/* Status */}
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-between gap-3 rounded-lg border px-3 text-sm text-muted-foreground hover:bg-muted"
-          >
-            <span>Status: All</span>
-            <ChevronDown className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Appointment table */}
-      <div className="overflow-hidden rounded-xl border bg-white">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-sm font-semibold">
-            Today&apos;s Appointments
-          </h2>
-
-          <p className="mt-1 text-xs text-muted-foreground">
-            {filteredAppointments.length} appointments shown
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead>
-              <tr className="border-b bg-muted/20">
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">
-                  Patient
-                </th>
-
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">
-                  Doctor
-                </th>
-
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">
-                  Department
-                </th>
-
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">
-                  Date & Time
-                </th>
-
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">
-                  Channel
-                </th>
-
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">
-                  Status
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y">
-              {filteredAppointments.map((appointment) => (
-                <tr
-                  key={appointment.id}
-                  className="transition-colors hover:bg-muted/20"
+      {/* Appointments Table */}
+      <div className="overflow-hidden rounded-xl border">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-muted/50 text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3 font-medium">Patient</th>
+              <th className="px-4 py-3 font-medium">Doctor</th>
+              <th className="px-4 py-3 font-medium">Department</th>
+              <th className="px-4 py-3 font-medium">Date & Time</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAppointments.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-4 py-8 text-center text-muted-foreground"
                 >
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {appointment.patient.charAt(0)}
-                      </div>
-
-                      <div>
-                        <p className="font-medium">
-                          {appointment.patient}
-                        </p>
-
-                        <p className="text-xs text-muted-foreground">
-                          {appointment.id}
-                        </p>
-                      </div>
+                  No appointments found.
+                </td>
+              </tr>
+            ) : (
+              filteredAppointments.map((appointment) => (
+                <tr key={appointment.id} className="border-t">
+                  <td className="px-4 py-3 font-medium">
+                    {appointment.patient}
+                  </td>
+                  <td className="px-4 py-3">{appointment.doctor}</td>
+                  <td className="px-4 py-3">{appointment.department}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {appointment.date} · {appointment.time}
                     </div>
                   </td>
-
-                  <td className="px-5 py-4">
-                    <p className="font-medium">
-                      {appointment.doctor}
-                    </p>
-                  </td>
-
-                  <td className="px-5 py-4 text-muted-foreground">
-                    {appointment.department}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
-                      <Clock3 className="h-4 w-4 text-muted-foreground" />
-
-                      <div>
-                        <p>{appointment.time}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {appointment.date}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs">
-                      {appointment.type}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-3">
                     <StatusBadge status={appointment.status} />
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* New appointment modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl border bg-white shadow-xl">
-            <div className="border-b px-6 py-5">
-              <h2 className="text-lg font-semibold">
-                New Appointment
-              </h2>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Create an appointment manually from the dashboard.
-              </p>
-            </div>
-
-            <div className="space-y-4 p-6">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">
-                  Patient
-                </label>
-
-                <select className="h-10 w-full rounded-lg border bg-white px-3 text-sm">
-                  <option>Select patient</option>
-                  <option>Ravi Kumar</option>
-                  <option>Priya Sharma</option>
-                  <option>Arun Singh</option>
-                  <option>Meena Devi</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">
-                  Department
-                </label>
-
-                <select className="h-10 w-full rounded-lg border bg-white px-3 text-sm">
-                  <option>Cardiology</option>
-                  <option>General Medicine</option>
-                  <option>Neurology</option>
-                  <option>Pediatrics</option>
-                  <option>Orthopedics</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">
-                  Doctor
-                </label>
-
-                <select className="h-10 w-full rounded-lg border bg-white px-3 text-sm">
-                  <option>Dr. Arjun Patel</option>
-                  <option>Dr. Neha Gupta</option>
-                  <option>Dr. Mohan Reddy</option>
-                  <option>Dr. Kavita Joshi</option>
-                </select>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Date
-                  </label>
-
-                  <input
-                    type="date"
-                    className="h-10 w-full rounded-lg border bg-white px-3 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Time
-                  </label>
-
-                  <select className="h-10 w-full rounded-lg border bg-white px-3 text-sm">
-                    <option>10:00 AM</option>
-                    <option>10:30 AM</option>
-                    <option>11:00 AM</option>
-                    <option>11:30 AM</option>
-                    <option>12:00 PM</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                Confirm Appointment
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Voice Assistant Overlay */}
+      {showVoiceAssistant && voiceToken && voiceServerUrl && (
+        <VoiceAssistant
+          token={voiceToken}
+          serverUrl={voiceServerUrl}
+          onClose={closeVoiceAssistant}
+        />
       )}
     </div>
   );
