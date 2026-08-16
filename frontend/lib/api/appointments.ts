@@ -1,132 +1,55 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:8000";
+import { apiFetch } from "./client";
+import { getRecentAppointments } from "./dashboard";
+import type { RecentAppointmentItem, Slot } from "./types";
 
-export interface AppointmentSlot {
-  id: string;
-  doctor_id: string;
-  specialization?: string;
-  slot_date: string;
-  start_time: string;
-  end_time?: string;
-  is_available: boolean;
+/** GET /appointments/slots?doctor_id=&date= */
+export async function getAppointmentSlots(params: {
+  doctorId?: string;
+  date?: string;
+}): Promise<Slot[]> {
+  const query = new URLSearchParams();
+  if (params.doctorId) query.set("doctor_id", params.doctorId);
+  if (params.date) query.set("date", params.date);
+  const qs = query.toString();
+  return apiFetch<Slot[]>(`/appointments/slots${qs ? `?${qs}` : ""}`);
 }
 
-export interface BookAppointmentRequest {
+export interface BookAppointmentPayload {
   patient_id: string;
-  slot_id: string;
-  reason?: string;
+  doctor_id: string;
+  appointment_slot_id: string;
+  booking_reason?: string;
 }
 
-export async function getAppointmentSlots(params?: {
-  specialization?: string;
-  date_from?: string;
-  limit?: number;
-}): Promise<AppointmentSlot[]> {
-  const searchParams = new URLSearchParams();
-
-  if (params?.specialization) {
-    searchParams.set(
-      "specialization",
-      params.specialization,
-    );
-  }
-
-  if (params?.date_from) {
-    searchParams.set(
-      "date_from",
-      params.date_from,
-    );
-  }
-
-  if (params?.limit) {
-    searchParams.set(
-      "limit",
-      String(params.limit),
-    );
-  }
-
-  const query = searchParams.toString();
-
-  const url = query
-    ? `${API_URL}/appointments/slots?${query}`
-    : `${API_URL}/appointments/slots`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
-    cache: "no-store",
+/** POST /appointments */
+export async function bookAppointment(payload: BookAppointmentPayload) {
+  return apiFetch("/appointments", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => null);
-
-    throw new Error(
-      error?.detail ??
-        "Failed to load available appointment slots.",
-    );
-  }
-
-  return response.json();
 }
 
-export async function bookAppointment(
-  data: BookAppointmentRequest,
-) {
-  const response = await fetch(
-    `${API_URL}/appointments`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(data),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => null);
-
-    throw new Error(
-      error?.detail ??
-        "Failed to book appointment.",
-    );
-  }
-
-  return response.json();
+/** POST /appointments/{appointment_id}/cancel */
+export async function cancelAppointment(appointmentId: string) {
+  return apiFetch(`/appointments/${appointmentId}/cancel`, {
+    method: "POST",
+  });
 }
 
-export async function cancelAppointment(
-  appointmentId: string,
-  patientId: string,
-) {
-  const response = await fetch(
-    `${API_URL}/appointments/${appointmentId}/cancel?patient_id=${patientId}`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-      },
-    },
-  );
+/** GET /appointments/patient/{patient_id} */
+export async function getPatientAppointments(patientId: string) {
+  return apiFetch(`/appointments/patient/${patientId}`);
+}
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => null);
-
-    throw new Error(
-      error?.detail ??
-        "Failed to cancel appointment.",
-    );
-  }
-
-  return response.json();
+/**
+ * There's no dedicated "list all appointments" endpoint on the backend yet
+ * (only /appointments/slots, /appointments/patient/{id}, book, and cancel).
+ * Until that's added, the Appointments page reuses the dashboard's
+ * recent-appointments endpoint with a high limit. Swap this out once a
+ * real GET /appointments listing endpoint exists.
+ */
+export async function getAllAppointments(
+  limit: number = 100,
+): Promise<RecentAppointmentItem[]> {
+  return getRecentAppointments(limit);
 }

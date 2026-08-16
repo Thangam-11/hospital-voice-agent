@@ -22,3 +22,11 @@ class AppointmentNotFoundError(ServiceError):
 class InvalidAppointmentStateError(ServiceError):
     """Raised when an action is attempted on an appointment in a state that
     doesn't allow it (e.g. cancelling an already-completed appointment)."""
+
+class ServiceError(Exception):
+    """Base class for all service-layer errors."""
+
+
+class DoctorNotFoundError(ServiceError):
+    """Raised when a referenced doctor doesn't exist."""
+

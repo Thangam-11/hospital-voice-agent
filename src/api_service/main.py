@@ -3,12 +3,13 @@ FastAPI entrypoint.
 
 Run with:
 
-    uvicorn src.main:app --reload
+    uvicorn src.api_service.main:app --reload
 """
 
 from typing import Optional
 
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +23,19 @@ from src.api_service.routers.appointment import (
 from src.api_service.routers.patient import (
     router as patient_router,
 )
-from src.api_service.routers.voice import router as voice_router
+
+from src.api_service.routers.doctor import (
+    router as doctor_router,
+)
+
+from src.api_service.routers.dashboard import (
+    router as dashboard_router,
+)
+
+from src.api_service.routers.voice import (
+    router as voice_router,
+)
+
 from src.agent.runner import run_agent
 from src.voice_call.runtime import get_checkpointer
 
@@ -45,12 +58,44 @@ app = FastAPI(
 
 
 # ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+# Allows the Next.js frontend to communicate with FastAPI during local
+# development.
+#
+# Frontend:
+#   http://localhost:3001
+#
+# Backend:
+#   http://127.0.0.1:8000
+# ---------------------------------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
 
 app.include_router(appointment_router)
+
 app.include_router(patient_router)
+
+app.include_router(doctor_router)
+
+app.include_router(dashboard_router)
+
 app.include_router(voice_router)
+
 
 # ---------------------------------------------------------------------------
 # Health
@@ -113,7 +158,6 @@ async def chat(
 
 @app.post("/voice/webhook")
 async def voice_webhook():
-
     return {
         "status": "not_implemented"
     }
