@@ -45,7 +45,7 @@ export default function CallHistoryPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getRecentCalls(100)
+    getRecentCalls(20)
       .then(setCalls)
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Failed to load calls."),

@@ -36,6 +36,9 @@ from src.api_service.routers.voice import (
     router as voice_router,
 )
 
+from src.api_service.routers.activity_logs import (
+    router as activity_logsrouter,
+)
 from src.agent.runner import run_agent
 from src.voice_call.runtime import get_checkpointer
 
@@ -95,8 +98,7 @@ app.include_router(doctor_router)
 app.include_router(dashboard_router)
 
 app.include_router(voice_router)
-
-
+app.include_router(activity_logsrouter)
 # ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------

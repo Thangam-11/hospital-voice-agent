@@ -317,3 +317,107 @@ class CallLog(Base):
     patient = relationship("Patient", back_populates="call_logs")
 
     appointment = relationship("Appointment", back_populates="call_log")
+
+class ActivityLog(Base):
+    """
+    Centralized application activity/audit history.
+
+    Tracks important events across patients, appointments,
+    voice calls, and other hospital operations.
+    """
+
+    __tablename__ = "activity_logs"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    # Example:
+    # APPOINTMENT_BOOKED
+    # APPOINTMENT_CANCELLED
+    # APPOINTMENT_RESCHEDULED
+    # PATIENT_REGISTERED
+    # PATIENT_VERIFIED
+    # CALL_COMPLETED
+    # CALL_ESCALATED
+    event_type = mapped_column(
+        String(100),
+        nullable=False,
+        index=True,
+    )
+
+    # Example:
+    # appointment
+    # patient
+    # call
+    # doctor
+    entity_type = mapped_column(
+        String(50),
+        nullable=False,
+        index=True,
+    )
+
+    # ID of the object associated with this event.
+    entity_id = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
+
+    patient_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("patients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    appointment_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("appointments.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Examples:
+    # AI_AGENT
+    # ADMIN
+    # PATIENT
+    # DOCTOR
+    # SYSTEM
+    actor_type = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    description = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    # Extra event-specific information.
+    #
+    # Python attribute = log_metadata
+    # Database column = metadata
+    log_metadata = mapped_column(
+        "metadata",
+        JSON,
+        nullable=True,
+    )
+
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        index=True,
+    )
+
+    patient = relationship(
+        "Patient",
+        foreign_keys=[patient_id],
+    )
+
+    appointment = relationship(
+        "Appointment",
+        foreign_keys=[appointment_id],
+    )

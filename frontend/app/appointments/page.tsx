@@ -1,8 +1,9 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Clock3 } from "lucide-react";
+import { CalendarDays, CalendarPlus, CheckCircle2, Clock3 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { BookAppointmentModal } from "@/components/appointments/book-appointment-modal";
 import { getAllAppointments } from "@/lib/api/appointments";
 import type { RecentAppointmentItem } from "@/lib/api/types";
 
@@ -36,16 +37,19 @@ export default function AppointmentsPage() {
     RecentAppointmentItem[] | null
   >(null);
   const [error, setError] = useState("");
+  const [showBooking, setShowBooking] = useState(false);
 
-  useEffect(() => {
-    getAllAppointments(100)
+  function reload() {
+    getAllAppointments(20)
       .then(setAppointments)
       .catch((err) =>
         setError(
           err instanceof Error ? err.message : "Failed to load appointments.",
         ),
       );
-  }, []);
+  }
+
+  useEffect(reload, []);
 
   return (
     <div className="space-y-5">
@@ -53,6 +57,15 @@ export default function AppointmentsPage() {
         <p className="text-sm text-slate-400">
           {appointments ? `${appointments.length} appointments` : ""}
         </p>
+
+        <button
+          type="button"
+          onClick={() => setShowBooking(true)}
+          className="flex items-center gap-1.5 rounded-lg bg-[#0D9488] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E]"
+        >
+          <CalendarPlus className="h-4 w-4" />
+          Book Appointment
+        </button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -104,6 +117,13 @@ export default function AppointmentsPage() {
           </table>
         )}
       </div>
+
+      {showBooking && (
+        <BookAppointmentModal
+          onClose={() => setShowBooking(false)}
+          onBooked={() => reload()}
+        />
+      )}
     </div>
   );
 }
