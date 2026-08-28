@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # ==========================
     # Application
     # ==========================
+
     app_name: str = "Hospital AI Voice Agent"
     environment: str = "development"
     debug: bool = True
@@ -15,43 +16,57 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "INFO"
 
-    # Comma-separated in .env, e.g. CORS_ORIGINS=http://localhost:3000,http://localhost:3001
-    cors_origins: str = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"
+    cors_origins: str = (
+        "http://localhost:3000,"
+        "http://localhost:3001,"
+        "http://127.0.0.1:3000,"
+        "http://127.0.0.1:3001"
+    )
 
-   # livekit configuration
+    # ==========================
+    # LiveKit
+    # ==========================
+
     livekit_url: str
     livekit_api_key: str
     livekit_api_secret: str
 
-    # voice
-   
+    # ==========================
+    # Voice
+    # ==========================
+
     deepgram_api_key: str
     elevenlabs_api_key: str
-    elevenlabs_voice_id : str
-   
+    elevenlabs_voice_id: str
+
     # ==========================
     # LLM
     # ==========================
 
     openrouter_api_key: str
-    llm_model: str = "qwen/qwen3-30b-a3b-instruct-2507"
-    openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    
+
+    llm_model: str = (
+        "qwen/qwen3-30b-a3b-instruct-2507"
+    )
+
+    openrouter_base_url: str = (
+        "https://openrouter.ai/api/v1"
+    )
 
     # ==========================
     # Embeddings
     # ==========================
-    embedding_model: str = "BAAI/bge-base-en-v1.5"
-    embedding_dim: int = 768
 
-    # ==========================
-    # Qdrant
-    # ==========================
-    
+    embedding_model: str = (
+        "BAAI/bge-base-en-v1.5"
+    )
+
+    embedding_dim: int = 768
 
     # ==========================
     # PostgreSQL
     # ==========================
+
     postgres_user: str
     postgres_password: str
     postgres_host: str
@@ -61,23 +76,27 @@ class Settings(BaseSettings):
     # ==========================
     # Redis
     # ==========================
+
     redis_url: str
     redis_cache_enabled: bool = True
     redis_cache_ttl_seconds: int = 3600
 
-   
     # ==========================
     # Monitoring
     # ==========================
+
     langsmith_enabled: bool = False
     langsmith_api_key: str = ""
-    langsmith_project: str = "hospital-voice-agent"
+    langsmith_project: str = (
+        "hospital-voice-agent"
+    )
 
     prometheus_port: int = 9090
 
     # ==========================
     # Security
     # ==========================
+
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
@@ -85,8 +104,13 @@ class Settings(BaseSettings):
     # ==========================
     # Feature Flags
     # ==========================
+
     rag_enabled: bool = True
     pii_guardrail_enabled: bool = True
+
+    # ==========================
+    # Pydantic configuration
+    # ==========================
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -96,7 +120,12 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+        return [
+            origin.strip()
+            for origin in self.cors_origins.split(",")
+            if origin.strip()
+        ]
 
 
 @lru_cache

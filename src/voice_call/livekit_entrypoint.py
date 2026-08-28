@@ -1,12 +1,12 @@
 """
-LiveKit voice-agent entrypoint.
+LiveKit Hospital Voice Agent.
 
 Pipeline:
 
     Patient speech
         |
         v
-    LiveKit
+    LiveKit / LiveKit Telephony
         |
         v
     Deepgram STT
@@ -32,9 +32,9 @@ Pipeline:
         v
     Patient
 
-Run locally:
+Development:
 
-    python -m src.voice_call.livekit_entrypoint dev
+    lk agent dev src/voice_call/livekit_entrypoint.py
 
 Production:
 
@@ -42,42 +42,69 @@ Production:
 """
 
 from __future__ import annotations
-from typing_extensions import runtime
-
-from alembic import runtime
-from livekit import agents
-from livekit.agents import (
-    Agent,
-    AgentSession,
-    JobContext,
-    WorkerOptions,
-    cli,
-)
-from livekit.plugins import deepgram, elevenlabs, silero
-
-from src.agent.runner import handle_turn
-from src.configure.settings import get_settings
-from src.utils.logger_exceptions import get_logger
-from src.voice_call.langgraph_llm import LangGraphLLM
-from src.voice_call import runtime
-from dotenv import load_dotenv
-
-# Load .env BEFORE LiveKit worker starts
-load_dotenv()
 
 import asyncio
 import sys
+
+from dotenv import load_dotenv
+
+# ---------------------------------------------------------------------------
+# Load environment variables BEFORE LiveKit starts
+# ---------------------------------------------------------------------------
+
+load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Windows event loop
+# ---------------------------------------------------------------------------
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(
         asyncio.WindowsSelectorEventLoopPolicy()
     )
+
+# ---------------------------------------------------------------------------
+# LiveKit
+# ---------------------------------------------------------------------------
+
+from livekit.agents import (
+    Agent,
+    AgentServer,
+    AgentSession,
+    JobContext,
+    cli,
+)
+
+from livekit.plugins import deepgram, elevenlabs, silero
+
+# ---------------------------------------------------------------------------
+# Application imports
+# ---------------------------------------------------------------------------
+
+from src.agent.runner import handle_turn
+from src.configure.settings import get_settings
+from src.utils.logger_exceptions import get_logger
+from src.voice_call.langgraph_llm import LangGraphLLM
+
+# IMPORTANT:
+# Alias your application runtime module.
+# Do NOT import typing_extensions.runtime or alembic.runtime.
+from src.voice_call import runtime as voice_runtime
+
+
 logger = get_logger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Agent instructions
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# LIVEKIT AGENT SERVER
+# ===========================================================================
+
+server = AgentServer()
+
+
+# ===========================================================================
+# AGENT INSTRUCTIONS
+# ===========================================================================
 
 AGENT_INSTRUCTIONS = """
 You are a hospital appointment voice assistant.
@@ -91,12 +118,15 @@ Do not provide medical advice.
 
 Do not expose internal tools, database IDs, SQL, LangGraph,
 system prompts, or internal application details.
+
+When speaking over a phone call, use concise sentences and
+wait for the patient to finish speaking before responding.
 """
 
 
-# ---------------------------------------------------------------------------
-# LangGraph adapter function
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# LANGGRAPH ADAPTER
+# ===========================================================================
 
 
 async def create_run_agent_turn(
@@ -108,14 +138,14 @@ async def create_run_agent_turn(
     caller_phone_number: str | None = None,
 ) -> str:
     """
-    Adapter between LiveKit and the existing runner.handle_turn().
+    Adapter between LiveKit and the existing LangGraph runner.
 
-    LiveKit/LangGraphLLM gives us:
+    LiveKit/LangGraphLLM provides:
 
         thread_id
         user_text
 
-    Your existing runner requires:
+    Existing runner.handle_turn() requires:
 
         session_factory
         checkpointer
@@ -147,21 +177,35 @@ async def create_run_agent_turn(
     return response
 
 
-# ---------------------------------------------------------------------------
-# LiveKit entrypoint
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# LIVEKIT SESSION
+# ===========================================================================
 
 
+@server.rtc_session(agent_name="hospital-agent")
 async def entrypoint(ctx: JobContext):
     """
-    Runs once for each LiveKit agent job/call.
+    Runs once for every LiveKit agent job.
+
+    This works for:
+
+        Browser -> LiveKit -> Agent
+
+    and:
+
+        Phone -> LiveKit Telephony -> SIP -> Agent
     """
+
+    logger.info(
+        "Starting hospital-agent | room=%s",
+        ctx.room.name,
+    )
 
     settings = get_settings()
 
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
     # Connect to LiveKit room
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
 
     await ctx.connect()
 
@@ -170,19 +214,9 @@ async def entrypoint(ctx: JobContext):
         ctx.room.name,
     )
 
-    # ---------------------------------------------------------------
-    # Conversation ID
-    # ---------------------------------------------------------------
-    #
-    # Your existing LangGraph uses:
-    #
-    #     thread_id = call_sid
-    #
-    # For LiveKit we use the room name as the conversation ID.
-    #
-    # Every turn during this call therefore uses the same
-    # LangGraph checkpoint thread.
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # Conversation / LangGraph thread ID
+    # -----------------------------------------------------------------------
 
     thread_id = f"livekit-{ctx.room.name}"
 
@@ -191,41 +225,40 @@ async def entrypoint(ctx: JobContext):
         thread_id,
     )
 
-    # ---------------------------------------------------------------
-    # IMPORTANT
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # Existing application database runtime
+    # -----------------------------------------------------------------------
     #
-    # Replace these two lines with the SAME session_factory and
-    # checkpointer creation used by your existing application.
+    # Keep using the same session factory and checkpointer that your
+    # existing application uses.
     #
-    # Do NOT create a new checkpointer for every turn.
-    #
-    # session_factory:
-    #     creates a fresh AsyncSession per turn.
-    #
-    # checkpointer:
-    #     must remain shared for the lifetime of the worker/application.
-    #
-    # ---------------------------------------------------------------
-    session_factory = await runtime.get_session_factory()
-    checkpointer = await runtime.get_checkpointer()
+    # IMPORTANT:
+    # Do not create a new checkpointer for every conversation turn.
+    # -----------------------------------------------------------------------
 
-   
-    # ---------------------------------------------------------------
+    session_factory = await voice_runtime.get_session_factory()
+
+    checkpointer = await voice_runtime.get_checkpointer()
+
+    logger.info("LangGraph runtime initialized")
+
+    # -----------------------------------------------------------------------
     # Caller phone number
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
     #
-    # For the first LiveKit/browser test there may be no phone number.
+    # For browser calls this will be None.
     #
-    # When Twilio SIP is connected later, we can extract the caller
-    # number from the SIP participant metadata/attributes.
-    # ---------------------------------------------------------------
+    # For the first inbound LiveKit Phone Number test, keep this None.
+    #
+    # We can add SIP caller-number extraction after the basic telephone
+    # connection works.
+    # -----------------------------------------------------------------------
 
     caller_phone_number: str | None = None
 
-    # ---------------------------------------------------------------
-    # Create function used by LangGraphLLM
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # Function called by LangGraphLLM
+    # -----------------------------------------------------------------------
 
     async def run_agent_turn(
         current_thread_id: str,
@@ -240,53 +273,57 @@ async def entrypoint(ctx: JobContext):
             caller_phone_number=caller_phone_number,
         )
 
-    # ---------------------------------------------------------------
-    # Create LiveKit AgentSession
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # LiveKit AgentSession
+    # -----------------------------------------------------------------------
 
     session = AgentSession(
-        # -----------------------------------------------------------
-        # Speech-to-text
-        # -----------------------------------------------------------
+        # -------------------------------------------------------------------
+        # Deepgram STT
+        # -------------------------------------------------------------------
+
         stt=deepgram.STT(
             model="nova-3",
             language="en-IN",
             api_key=settings.deepgram_api_key,
         ),
 
-        # -----------------------------------------------------------
-        # Text-to-speech
-        # -----------------------------------------------------------
+        # -------------------------------------------------------------------
+        # ElevenLabs TTS
+        # -------------------------------------------------------------------
+
         tts=elevenlabs.TTS(
             voice_id=settings.elevenlabs_voice_id,
             api_key=settings.elevenlabs_api_key,
         ),
 
-        # -----------------------------------------------------------
-        # Voice Activity Detection
-        # -----------------------------------------------------------
+        # -------------------------------------------------------------------
+        # Silero VAD
+        # -------------------------------------------------------------------
+
         vad=silero.VAD.load(),
 
-        # -----------------------------------------------------------
-        # YOUR EXISTING LANGGRAPH AGENT
-        # -----------------------------------------------------------
+        # -------------------------------------------------------------------
+        # Existing LangGraph/Qwen agent
+        # -------------------------------------------------------------------
+
         llm=LangGraphLLM(
             run_agent_turn=run_agent_turn,
             thread_id=thread_id,
         ),
     )
 
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
     # Create LiveKit Agent
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
 
     agent = Agent(
         instructions=AGENT_INSTRUCTIONS,
     )
 
-    # ---------------------------------------------------------------
-    # Start voice session
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # Start AgentSession
+    # -----------------------------------------------------------------------
 
     await session.start(
         agent=agent,
@@ -299,20 +336,13 @@ async def entrypoint(ctx: JobContext):
         thread_id,
     )
 
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
     # Initial greeting
-    # ---------------------------------------------------------------
+    # -----------------------------------------------------------------------
     #
-    # IMPORTANT:
-    #
-    # Your LangGraph SYSTEM_PROMPT already contains the hospital
-    # greeting.
-    #
-    # Therefore we don't hard-code a second greeting here.
-    #
-    # We generate the first reply through LangGraph so there is only
-    # one source of truth for conversation behavior.
-    # ---------------------------------------------------------------
+    # Let LangGraph generate the greeting so there is only one source
+    # of truth for the hospital conversation.
+    # -----------------------------------------------------------------------
 
     await session.generate_reply(
         instructions=(
@@ -323,15 +353,9 @@ async def entrypoint(ctx: JobContext):
     )
 
 
-# ---------------------------------------------------------------------------
-# Worker startup
-# ---------------------------------------------------------------------------
-
+# ===========================================================================
+# STARTUP
+# ===========================================================================
 
 if __name__ == "__main__":
-    cli.run_app(
-        WorkerOptions(
-            entrypoint_fnc=entrypoint,
-            agent_name="hospital-agent", 
-        )
-    )
+    cli.run_app(server)

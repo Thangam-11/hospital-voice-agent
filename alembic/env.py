@@ -8,7 +8,7 @@ from alembic import context
 
 from src.configure.settings import get_settings
 from src.database.base import Base
-
+from src.database.policy_chunk import PolicyChunk
 # Import all models so Alembic can see Base.metadata
 from src.database.models import (
     Patient,
@@ -74,7 +74,7 @@ async def run_async_migrations() -> None:
         {},
     )
 
-    # Use the same database URL as the application
+    # Use the same database URL as the applicationc
     configuration["sqlalchemy.url"] = settings.database_url
 
     connectable = async_engine_from_config(

@@ -421,3 +421,126 @@ class ActivityLog(Base):
         "Appointment",
         foreign_keys=[appointment_id],
     )
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    email = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    username = mapped_column(
+        String(100),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    hashed_password = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    full_name = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    role = mapped_column(
+        String(50),
+        nullable=False,
+        default="ADMIN",
+    )
+
+    is_active = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    last_login = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    refresh_tokens = relationship(
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    user_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    token_hash = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    expires_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    is_revoked = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    user_agent = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
+    ip_address = mapped_column(
+        String(45),
+        nullable=True,
+    )
+
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    user = relationship(
+        "User",
+        back_populates="refresh_tokens",
+    )

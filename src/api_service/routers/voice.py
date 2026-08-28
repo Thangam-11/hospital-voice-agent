@@ -90,10 +90,13 @@ async def create_voice_token(
         FastAPI
             |
             v
-        LiveKit JWT
+        LiveKit JWT (with agent dispatch)
             |
             v
         Frontend connects to LiveKit
+            |
+            v
+        LiveKit dispatches "hospital-agent" into the room
     """
 
     # ---------------------------------------------------------
@@ -152,6 +155,8 @@ async def create_voice_token(
 
     # ---------------------------------------------------------
     # Create access token
+    # (with explicit agent dispatch so "hospital-agent" joins
+    #  the room automatically when the patient connects)
     # ---------------------------------------------------------
 
     token = (
@@ -170,11 +175,20 @@ async def create_voice_token(
                 can_publish_data=True,
             )
         )
+        .with_room_config(
+            api.RoomConfiguration(
+                agents=[
+                    api.RoomAgentDispatch(
+                        agent_name="hospital-agent",
+                    )
+                ]
+            )
+        )
         .to_jwt()
     )
 
     logger.info(
-        "LiveKit token created | room=%s | identity=%s",
+        "LiveKit token created | room=%s | identity=%s | agent=hospital-agent",
         room_name,
         participant_identity,
     )
