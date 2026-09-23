@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth_service.jwt_service import JWTService
-from src.auth_service.security import verify_password
+from src.auth_service.security import hash_password, verify_password
 from src.configure.settings import get_settings
 from src.database.models import User, RefreshToken
 
@@ -34,6 +34,53 @@ def _hash_token(raw_token: str) -> str:
 
 
 class AuthService:
+        # =========================================================
+    # REGISTER
+    # =========================================================
+
+    async def register(
+        self,
+        email: str,
+        username: str,
+        full_name: str,
+        password: str,
+        db: AsyncSession,
+    ) -> User:
+
+        # 1. Check whether email already exists
+        result = await db.execute(
+            select(User).where(User.email == email)
+        )
+
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+
+        # 2. Hash password using existing bcrypt implementation
+        hashed_password = hash_password(password)
+
+        # 3. Create admin user
+        user = User(
+            email=email,
+            username=username,
+            full_name=full_name,
+            hashed_password=hashed_password,
+            role="ADMIN",
+            is_active=True,
+        )
+
+        # 4. Save to PostgreSQL
+        db.add(user)
+
+        await db.commit()
+        await db.refresh(user)
+
+        return user
+
 
     # =========================================================
     # LOGIN

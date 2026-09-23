@@ -2,33 +2,63 @@
 
 import { Bell, Search } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { getCurrentUser } from "@/lib/api/auth";
+import type { AuthUser } from "@/lib/api/auth";
 import { getPatients } from "@/lib/api/patients";
 import type { Patient } from "@/lib/api/types";
 
-interface HeaderProps {
-  title?: string;
-  subtitle?: string;
-}
+const PAGE_META: Record<string, { title: string; subtitle: string }> = {
+  "/dashboard": {
+    title: "Overview",
+    subtitle: "Hospital operations at a glance",
+  },
+  "/dashboard/patients": {
+    title: "Patients",
+    subtitle: "All registered patients",
+  },
+  "/dashboard/appointments": {
+    title: "Appointments",
+    subtitle: "All scheduled appointments",
+  },
+  "/dashboard/voice-agents": {
+    title: "Voice Agents",
+    subtitle: "Monitor and test the AI assistant",
+  },
+  "/dashboard/call-history": {
+    title: "Call History",
+    subtitle: "All AI voice agent calls",
+  },
+  "/dashboard/settings": {
+    title: "Settings",
+    subtitle: "Account and preferences",
+  },
+};
 
-export default function Header({
-  title = "Overview",
-  subtitle = "Hospital operations at a glance",
-}: HeaderProps) {
+export default function Header() {
+  const pathname = usePathname() || "/dashboard";
+  const meta = PAGE_META[pathname] ?? { title: "Dashboard", subtitle: "" };
+
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Patient[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Debounced live search against /patients?search=
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null));
+  }, []);
+
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
       setOpen(false);
       return;
     }
-
     const timeout = setTimeout(() => {
       getPatients(query)
         .then((patients) => {
@@ -37,11 +67,9 @@ export default function Header({
         })
         .catch(() => setResults([]));
     }, 300);
-
     return () => clearTimeout(timeout);
   }, [query]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (
@@ -61,13 +89,15 @@ export default function Header({
     year: "numeric",
   });
 
+  const initial = user?.full_name?.charAt(0)?.toUpperCase() ?? "?";
+
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4">
       <div>
         <h1 className="text-[19px] font-semibold tracking-tight text-slate-900">
-          {title}
+          {meta.title}
         </h1>
-        <p className="mt-0.5 text-[12.5px] text-slate-400">{subtitle}</p>
+        <p className="mt-0.5 text-[12.5px] text-slate-400">{meta.subtitle}</p>
       </div>
 
       <div className="flex items-center gap-5">
@@ -91,7 +121,7 @@ export default function Header({
               {results.map((patient) => (
                 <Link
                   key={patient.id}
-                  href={`/patients/${patient.id}`}
+                  href={`/dashboard/patients/${patient.id}`}
                   className="block px-4 py-2.5 text-sm transition-colors hover:bg-slate-50"
                   onClick={() => setOpen(false)}
                 >
@@ -128,11 +158,15 @@ export default function Header({
 
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0B1220] text-sm font-semibold text-white">
-            T
+            {initial}
           </div>
           <div className="text-sm leading-tight">
-            <p className="font-medium text-slate-900">Thangarasu</p>
-            <p className="text-[11.5px] text-slate-400">Administrator</p>
+            <p className="font-medium text-slate-900">
+              {user?.full_name ?? "Loading…"}
+            </p>
+            <p className="text-[11.5px] capitalize text-slate-400">
+              {user?.role?.toLowerCase() ?? ""}
+            </p>
           </div>
         </div>
       </div>

@@ -3,27 +3,46 @@
 import {
   CalendarDays,
   LayoutGrid,
+  LogOut,
   Mic,
   PhoneCall,
+  Settings,
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { getCurrentUser, logout } from "@/lib/api/auth";
+import type { AuthUser } from "@/lib/api/auth";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
-  { href: "/patients", label: "Patients", icon: Users },
-  { href: "/appointments", label: "Appointments", icon: CalendarDays },
-  { href: "/voice-agent", label: "Voice Agent", icon: Mic },
-  { href: "/call-history", label: "Call History", icon: PhoneCall },
+  { href: "/dashboard/patients", label: "Patients", icon: Users },
+  { href: "/dashboard/appointments", label: "Appointments", icon: CalendarDays },
+  { href: "/dashboard/voice-agents", label: "Voice Agent", icon: Mic },
+  { href: "/dashboard/call-history", label: "Call History", icon: PhoneCall },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null));
+  }, []);
+
+  async function handleLogout() {
+    await logout();
+    router.push("/login");
+  }
 
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col bg-[#0B1220] text-slate-300">
-      {/* Brand */}
       <div className="flex items-center gap-3 px-5 pb-5 pt-6">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0D9488]">
           <Mic className="h-4 w-4 text-white" />
@@ -40,11 +59,13 @@ export default function Sidebar() {
 
       <div className="mx-5 h-px bg-white/5" />
 
-      {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-3 py-5">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const active = pathname?.startsWith(item.href);
+          const active =
+            item.href === "/dashboard"
+              ? pathname === "/dashboard"
+              : pathname?.startsWith(item.href);
 
           return (
             <Link
@@ -72,40 +93,31 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Voice agent CTA */}
-      <div className="px-3 pb-3">
-        <Link
-          href="/voice-agent"
-          className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-gradient-to-br from-[#0D9488]/20 to-[#0D9488]/5 px-3.5 py-3 transition-colors hover:from-[#0D9488]/25"
-        >
-          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0D9488]">
-            <Mic className="h-4 w-4 text-white" />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0B1220] bg-[#2DD4BF]" />
-          </span>
-          <span>
-            <span className="block text-[13px] font-semibold text-white">
-              Start Voice Agent
-            </span>
-            <span className="block text-[11px] text-slate-400">
-              Talk to AI Assistant
-            </span>
-          </span>
-        </Link>
-      </div>
-
       <div className="mx-5 h-px bg-white/5" />
 
-      {/* User */}
-      <div className="flex items-center gap-3 px-5 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
-          T
+      <div className="space-y-2 px-3 py-4">
+        <div className="flex items-center gap-3 px-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
+            {user?.full_name?.charAt(0)?.toUpperCase() ?? "?"}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium text-white">
+              {user?.full_name ?? "Loading…"}
+            </p>
+            <p className="text-[11px] capitalize text-slate-500">
+              {user?.role?.toLowerCase() ?? ""}
+            </p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-[13px] font-medium text-white">
-            Thangarasu
-          </p>
-          <p className="text-[11px] text-slate-500">Administrator</p>
-        </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-[13px] font-medium text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-slate-200"
+        >
+          <LogOut className="h-4 w-4" />
+          Log out
+        </button>
       </div>
     </aside>
   );

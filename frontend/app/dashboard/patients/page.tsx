@@ -1,8 +1,9 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { NewPatientModal } from "@/components/patients/new-patient-modal";
 import { getPatients } from "@/lib/api/patients";
 import type { Patient } from "@/lib/api/types";
 
@@ -10,22 +11,25 @@ export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[] | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const [showNewPatient, setShowNewPatient] = useState(false);
+
+  function reload() {
+    getPatients(query || undefined)
+      .then(setPatients)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Failed to load patients."),
+      );
+  }
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      getPatients(query || undefined)
-        .then(setPatients)
-        .catch((err) =>
-          setError(err instanceof Error ? err.message : "Failed to load patients."),
-        );
-    }, 250);
-
+    const timeout = setTimeout(reload, 250);
     return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div className="relative w-80">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -36,11 +40,21 @@ export default function PatientsPage() {
           />
         </div>
 
-        {patients && (
-          <span className="text-sm text-slate-400">
-            {patients.length} patient{patients.length === 1 ? "" : "s"}
-          </span>
-        )}
+        <div className="flex items-center gap-4">
+          {patients && (
+            <span className="text-sm text-slate-400">
+              {patients.length} patient{patients.length === 1 ? "" : "s"}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowNewPatient(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-[#0D9488] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E]"
+          >
+            <Plus className="h-4 w-4" />
+            New Patient
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -96,6 +110,13 @@ export default function PatientsPage() {
           </table>
         )}
       </div>
+
+      {showNewPatient && (
+        <NewPatientModal
+          onClose={() => setShowNewPatient(false)}
+          onCreated={() => reload()}
+        />
+      )}
     </div>
   );
 }

@@ -1,10 +1,12 @@
 from pydantic import BaseModel, EmailStr, Field
 
+
 class AuthRegisterRequest(BaseModel):
-    email:EmailStr
-    user_name : str = Field(min_length=3, max_length=50)
-    full_name : str = Field(min_length=3, max_length=50)
-    password : str =  Field(min_length=8, max_length=128)
+    email: EmailStr
+    username: str = Field(min_length=3, max_length=50)
+    full_name: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=128)
+
 
 class AdminLoginRequest(BaseModel):
     email: EmailStr
@@ -18,13 +20,6 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
-class AdminResponse(BaseModel):
-    id: str
-    email: str
-    username: str
-    full_name: str
-    role: str
-    is_active: bool
 class AdminResponse(BaseModel):
     id: str
     email: str

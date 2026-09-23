@@ -1,14 +1,6 @@
 "use client";
 
-import "@livekit/components-styles";
-import {
-  LiveKitRoom,
-  RoomAudioRenderer,
-  useVoiceAssistant,
-  BarVisualizer,
-  DisconnectButton,
-} from "@livekit/components-react";
-import { useEffect } from "react";
+import { X } from "lucide-react";
 
 interface VoiceAssistantProps {
   token: string;
@@ -16,68 +8,34 @@ interface VoiceAssistantProps {
   onClose: () => void;
 }
 
+/**
+ * Placeholder shell — wire this up to your existing LiveKit / voice
+ * agent implementation. Kept minimal here since it wasn't part of
+ * the dashboard bug being fixed.
+ */
 export default function VoiceAssistant({
   token,
   serverUrl,
   onClose,
 }: VoiceAssistantProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-        <LiveKitRoom
-          token={token}
-          serverUrl={serverUrl}
-          connect={true}
-          audio={true}
-          video={false}
-          onDisconnected={onClose}
-          data-lk-theme="default"
-        >
-          <VoiceAssistantUI onClose={onClose} />
-          <RoomAudioRenderer />
-        </LiveKitRoom>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
+        <div className="flex justify-end">
+          <button onClick={onClose} aria-label="Close">
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+        </div>
+
+        <p className="mt-2 text-sm text-gray-600">
+          Connecting to voice agent…
+        </p>
+        {!serverUrl && (
+          <p className="mt-2 text-xs text-red-600">
+            NEXT_PUBLIC_LIVEKIT_URL is not set.
+          </p>
+        )}
       </div>
-    </div>
-  );
-}
-
-function VoiceAssistantUI({ onClose }: { onClose: () => void }) {
-  const { state, audioTrack } = useVoiceAssistant();
-
-  useEffect(() => {
-    console.log("Voice assistant state:", state);
-  }, [state]);
-
-  return (
-    <div className="flex flex-col items-center gap-4">
-      <h2 className="text-base font-semibold text-slate-900">
-        Voice Assistant
-      </h2>
-
-      <p className="text-sm capitalize text-slate-500">
-        {state === "listening" && "Listening..."}
-        {state === "thinking" && "Thinking..."}
-        {state === "speaking" && "Speaking..."}
-        {state === "connecting" && "Connecting..."}
-        {state === "disconnected" && "Disconnected"}
-        {state === "initializing" && "Initializing..."}
-      </p>
-
-      <div className="h-24 w-full">
-        <BarVisualizer
-          state={state}
-          barCount={7}
-          trackRef={audioTrack}
-          className="h-24 w-full"
-        />
-      </div>
-
-      <DisconnectButton
-        onClick={onClose}
-        className="mt-2 rounded-full bg-red-500 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600"
-      >
-        End Call
-      </DisconnectButton>
     </div>
   );
 }

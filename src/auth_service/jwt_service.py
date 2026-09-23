@@ -53,8 +53,8 @@ class JWTService:
 
         return jwt.encode(
             payload,
-            settings.secret_key,
-            algorithm=settings.algorithm,
+            settings.jwt_secret_key,
+            algorithm=settings.jwt_algorithm,
         )
 
     # =========================================================
@@ -79,8 +79,8 @@ class JWTService:
 
         return jwt.encode(
             payload,
-            settings.secret_key,
-            algorithm=settings.algorithm,
+            settings.jwt_secret_key,
+            algorithm=settings.jwt_algorithm,
         )
 
     # =========================================================
@@ -93,8 +93,8 @@ class JWTService:
         try:
             return jwt.decode(
                 token,
-                settings.secret_key,
-                algorithms=[settings.algorithm],
+                settings.jwt_secret_key,
+                algorithms=[settings.jwt_algorithm],
             )
 
         except ExpiredSignatureError as exc:

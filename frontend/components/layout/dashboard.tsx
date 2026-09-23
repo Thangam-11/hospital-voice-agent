@@ -1,5 +1,6 @@
 "use client";
 
+import { ActivityLogCard } from "@/components/dashboard/activity-log";
 import { AppointmentTrendChart } from "@/components/dashboard/appointment-trend-chart";
 import { AppointmentsCard } from "@/components/dashboard/appointments-card";
 import { DepartmentChart } from "@/components/dashboard/department-chart";
@@ -28,9 +29,10 @@ export default function Dashboard() {
           <div className="h-px flex-1 bg-slate-200" />
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-3">
           <AppointmentTrendChart />
           <DepartmentChart />
+          <ActivityLogCard />
         </div>
       </section>
     </div>
